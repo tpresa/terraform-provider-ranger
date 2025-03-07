@@ -1,0 +1,1 @@
+ranger_password = "dummy_password" 

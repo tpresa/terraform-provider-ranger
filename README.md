@@ -1,64 +1,124 @@
-# Terraform Provider Scaffolding (Terraform Plugin Framework)
+# Terraform Provider for Apache Ranger
 
-_This template repository is built on the [Terraform Plugin Framework](https://github.com/hashicorp/terraform-plugin-framework). The template repository built on the [Terraform Plugin SDK](https://github.com/hashicorp/terraform-plugin-sdk) can be found at [terraform-provider-scaffolding](https://github.com/hashicorp/terraform-provider-scaffolding). See [Which SDK Should I Use?](https://developer.hashicorp.com/terraform/plugin/framework-benefits) in the Terraform documentation for additional information._
+This Terraform provider allows you to manage [Apache Ranger](https://ranger.apache.org/) resources through Terraform. Apache Ranger is a framework to enable, monitor, and manage comprehensive data security across the Hadoop platform.
 
-This repository is a *template* for a [Terraform](https://www.terraform.io) provider. It is intended as a starting point for creating Terraform providers, containing:
+## Features
 
-- A resource and a data source (`internal/provider/`),
-- Examples (`examples/`) and generated documentation (`docs/`),
-- Miscellaneous meta files.
-
-These files contain boilerplate code that you will need to edit to create your own Terraform provider. Tutorials for creating Terraform providers can be found on the [HashiCorp Developer](https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework) platform. _Terraform Plugin Framework specific guides are titled accordingly._
-
-Please see the [GitHub template repository documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template) for how to create a new repository from this template on GitHub.
-
-Once you've written your provider, you'll want to [publish it on the Terraform Registry](https://developer.hashicorp.com/terraform/registry/providers/publishing) so that others can use it.
+- Manage Apache Ranger access policies via Terraform
+- Create, update, and delete policies for various Ranger services (HDFS, Hive, etc.)
+- Read existing policies using data sources
+- Support for basic authentication with Ranger Admin REST API
 
 ## Requirements
 
-- [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.22
+- [Terraform](https://www.terraform.io/downloads.html) >= 1.0
+- [Go](https://golang.org/doc/install) >= 1.19
+- An Apache Ranger instance with Admin REST API accessible
 
 ## Building The Provider
 
 1. Clone the repository
-1. Enter the repository directory
-1. Build the provider using the Go `install` command:
+2. Enter the repository directory
+3. Build the provider using `make build`
 
 ```shell
-go install
+git clone https://github.com/example/terraform-provider-ranger
+cd terraform-provider-ranger
+make build
 ```
-
-## Adding Dependencies
-
-This provider uses [Go modules](https://github.com/golang/go/wiki/Modules).
-Please see the Go documentation for the most up to date information about using Go modules.
-
-To add a new dependency `github.com/author/dependency` to your Terraform provider:
-
-```shell
-go get github.com/author/dependency
-go mod tidy
-```
-
-Then commit the changes to `go.mod` and `go.sum`.
 
 ## Using the provider
 
-Fill this in for each provider
+To use the provider, include it in your Terraform configuration:
 
-## Developing the Provider
+```hcl
+terraform {
+  required_providers {
+    ranger = {
+      source  = "hashicorp/ranger"
+      version = "~> 1.0"
+    }
+  }
+}
 
-If you wish to work on the provider, you'll first need [Go](http://www.golang.org) installed on your machine (see [Requirements](#requirements) above).
+provider "ranger" {
+  endpoint = "http://ranger.example.com:6080"
+  username = "admin"
+  password = var.ranger_password # using a variable for sensitive information
+  insecure = false  # Set to true to disable TLS verification
+}
+```
 
-To compile the provider, run `go install`. This will build the provider and put the provider binary in the `$GOPATH/bin` directory.
+### Example: Creating a Ranger policy for HDFS
 
-To generate or update documentation, run `make generate`.
+```hcl
+resource "ranger_policy" "hdfs_finance_reports" {
+  name        = "finance_reports_access"
+  service     = "hdfs"
+  description = "Policy to allow access to finance reports directory"
+  is_enabled  = true
 
-In order to run the full suite of Acceptance tests, run `make testacc`.
+  # Define resource scope: finance reports directory
+  resources {
+    type        = "path"
+    values      = ["/data/finance/reports"]
+    is_exclude  = false
+    is_recursive = true  # Apply to subdirectories
+  }
 
-*Note:* Acceptance tests create real resources, and often cost money to run.
+  # Allow rule for finance team
+  policy_item {
+    users         = []
+    groups        = ["finance", "finance_analysts"]
+    roles         = []
+    permissions   = ["read", "write", "execute"]
+    delegate_admin = false
+  }
+
+  # Allow rule for auditors (read-only)
+  policy_item {
+    users         = []
+    groups        = ["auditors"]
+    roles         = []
+    permissions   = ["read", "execute"]
+    delegate_admin = false
+  }
+}
+```
+
+### Example: Reading an existing policy
+
+```hcl
+data "ranger_policy" "existing_policy" {
+  service = "hive"
+  name    = "existing_hive_database_policy"
+}
+
+output "policy_id" {
+  value = data.ranger_policy.existing_policy.id
+}
+```
+
+## Documentation
+
+Full documentation is available in the [docs](./docs) directory.
+
+## Development
+
+If you wish to work on the provider, you'll need [Go](http://www.golang.org) installed on your machine (version 1.19+ recommended).
+
+To compile the provider:
 
 ```shell
-make testacc
+make build
 ```
+
+To run the full suite of tests:
+
+```shell
+make test
+```
+
+## License
+
+[MPL-2.0](LICENSE)
